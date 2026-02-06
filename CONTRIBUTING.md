@@ -170,6 +170,42 @@ mise run python:dev      # Install Python package in development mode (builds CL
 mise run python:build    # Build Python wheel with CLI binary
 ```
 
+### Publishing
+
+Versions are derived from git tags using `setuptools_scm`. No version bumps need to be committed.
+
+**Version commands:**
+
+```bash
+mise run version:print             # Show computed versions (python, cargo, docker)
+mise run version:print -- --cargo  # Show cargo version only
+mise run version:set               # Update Cargo.toml with git-derived version (or specified with --version)
+mise run version:reset             # Restore Cargo.toml to git state
+```
+
+**Publishing to Artifactory:**
+
+```bash
+# Configure credentials (one-time setup).
+echo "
+NAV_DOCKER_USER=$USER
+NAV_DOCKER_TOKEN=$ARTIFACTORY_PASSWORD
+NAV_PYPI_USERNAME=$USER
+NAV_PYPI_PASSWORD=$ARTIFACTORY_PASSWORD" >> .env
+
+# Publish everything
+mise run publish
+```
+
+**Tagging a release:**
+
+```bash
+git tag v0.1.1
+git push --tags
+# CI will build and publish, or manually:
+mise run publish
+```
+
 ### Cleaning
 
 ```bash

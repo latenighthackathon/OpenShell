@@ -180,3 +180,6 @@ kubeconfig
 
 # Docker build artifacts (image tarballs, packaged helm charts)
 deploy/docker/.build/
+
+# Local mise settings
+mise.local.toml
