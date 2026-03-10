@@ -466,6 +466,7 @@ DGX Spark</label><div class="sd-tab-content docutils">
 <input checked="checked" id="sd-tab-item-2" name="sd-tab-set-1" type="radio">
 <label class="sd-tab-label" for="sd-tab-item-2">
 Claude Code</label><div class="sd-tab-content docutils">
+<p>Run the following command to create a sandbox with Claude Code:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>sandbox<span class="w"> </span>create<span class="w"> </span>--<span class="w"> </span>claude
 </pre></div>
 </div>
@@ -474,37 +475,39 @@ Claude Code</label><div class="sd-tab-content docutils">
 <input id="sd-tab-item-3" name="sd-tab-set-1" type="radio">
 <label class="sd-tab-label" for="sd-tab-item-3">
 OpenCode</label><div class="sd-tab-content docutils">
+<p>Run the following command to create a sandbox with OpenCode:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>sandbox<span class="w"> </span>create<span class="w"> </span>--<span class="w"> </span>opencode
 </pre></div>
 </div>
-<p>The CLI prompts you to create a provider from local credentials — type <code class="docutils literal notranslate"><span class="pre">yes</span></code> to continue. If <code class="docutils literal notranslate"><span class="pre">OPENAI_API_KEY</span></code> or <code class="docutils literal notranslate"><span class="pre">OPENROUTER_API_KEY</span></code> is set in your environment, it is picked up automatically. If not, you can configure it from inside the sandbox after it launches.</p>
+<p>The CLI prompts you to create a provider from local credentials. Type <code class="docutils literal notranslate"><span class="pre">yes</span></code> to continue. If <code class="docutils literal notranslate"><span class="pre">OPENAI_API_KEY</span></code> or <code class="docutils literal notranslate"><span class="pre">OPENROUTER_API_KEY</span></code> is set in your environment, it is picked up automatically. If not, you can configure it from inside the sandbox after it launches.</p>
 </div>
 <input id="sd-tab-item-4" name="sd-tab-set-1" type="radio">
 <label class="sd-tab-label" for="sd-tab-item-4">
 Codex</label><div class="sd-tab-content docutils">
+<p>Run the following command to create a sandbox with Codex:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>sandbox<span class="w"> </span>create<span class="w"> </span>--<span class="w"> </span>codex
 </pre></div>
 </div>
-<p>The CLI prompts you to create a provider from local credentials — type <code class="docutils literal notranslate"><span class="pre">yes</span></code> to continue. If <code class="docutils literal notranslate"><span class="pre">OPENAI_API_KEY</span></code> is set in your environment, it is picked up automatically. If not, you can configure it from inside the sandbox after it launches.</p>
+<p>The CLI prompts you to create a provider from local credentials. Type <code class="docutils literal notranslate"><span class="pre">yes</span></code> to continue. If <code class="docutils literal notranslate"><span class="pre">OPENAI_API_KEY</span></code> is set in your environment, it is picked up automatically. If not, you can configure it from inside the sandbox after it launches.</p>
 </div>
 <input id="sd-tab-item-5" name="sd-tab-set-1" type="radio">
 <label class="sd-tab-label" for="sd-tab-item-5">
-Community Sandbox</label><div class="sd-tab-content docutils">
+OpenClaw</label><div class="sd-tab-content docutils">
+<p>Run the following command to create a sandbox with OpenClaw:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>sandbox<span class="w"> </span>create<span class="w"> </span>--from<span class="w"> </span>openclaw
 </pre></div>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">--from</span></code> flag pulls a pre-built sandbox definition from the <a class="reference external" href="https://github.com/NVIDIA/OpenShell-Community" rel="noreferer noopener" target="_blank">OpenShell Community</a> catalog. Each definition bundles a container image, a tailored policy, and optional skills into a single package.</p>
 </div>
+<input id="sd-tab-item-6" name="sd-tab-set-1" type="radio">
+<label class="sd-tab-label" for="sd-tab-item-6">
+Community Sandbox</label><div class="sd-tab-content docutils">
+<p>You can use the <code class="docutils literal notranslate"><span class="pre">--from</span></code> flag to pull other OpenShell sandbox images from the <a class="reference external" href="https://registry.nvidia.com/" rel="noreferer noopener" target="_blank">NVIDIA Container Registry</a>. For example, to pull the <code class="docutils literal notranslate"><span class="pre">base</span></code> image, run the following command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>sandbox<span class="w"> </span>create<span class="w"> </span>--from<span class="w"> </span>base
+</pre></div>
 </div>
-</section>
-<section id="next-steps">
-<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">#</a></h2>
-<p>You now have a working sandbox! From here, you can:</p>
-<ul class="simple">
-<li><p><strong>Follow a guided tutorial</strong> — set up scoped GitHub repo access in <a class="reference internal" href="../tutorials/github-sandbox.html"><span class="doc">Set Up a Sandbox with GitHub Repo Access</span></a>.</p></li>
-<li><p><strong>Learn how sandboxes work</strong> — refer to <a class="reference internal" href="../sandboxes/create-and-manage.html"><span class="doc">Create and Manage Sandboxes</span></a> for the full lifecycle.</p></li>
-<li><p><strong>Write your own policies</strong> — refer to <a class="reference internal" href="../sandboxes/policies.html"><span class="doc">Customize Sandbox Policies</span></a> for custom access rules.</p></li>
-</ul>
+</div>
+</div>
 </section>
 </section>
 
@@ -561,7 +564,6 @@ Community Sandbox</label><div class="sd-tab-content docutils">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#install-the-openshell-cli">Install the OpenShell CLI</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#connect-to-a-remote-gateway-optional">Connect to a Remote Gateway (Optional)</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-your-first-openshell-sandbox">Create Your First OpenShell Sandbox</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#next-steps">Next Steps</a></li>
 </ul>
   </nav></div>
 

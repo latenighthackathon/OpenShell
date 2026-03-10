@@ -404,18 +404,18 @@
 -->
 <section class="tex2jax_ignore mathjax_ignore" id="set-up-a-sandbox-with-github-repo-access">
 <h1>Set Up a Sandbox with GitHub Repo Access<a class="headerlink" href="#set-up-a-sandbox-with-github-repo-access" title="Link to this heading">#</a></h1>
-<p>Multi-repository workflows require differentiated access controls. An agent that commits code to a feature repository must have read-write permissions, while a shared library it depends on should remain read-only. OpenShell policies enforce this separation at the network layer — the proxy inspects each Git and API request and applies per-repository rules before traffic leaves the sandbox.</p>
-<p>This tutorial demonstrates how to configure a sandbox with two repositories at distinct privilege levels.</p>
+<p>This tutorial walks through configuring a sandbox that grants different access levels to two GitHub repositories and enforces these rules at the network layer. The sandbox runs Claude Code as the agent.</p>
+<p>The tutorial uses the following two example repositories for illustration purposes.</p>
 <ul class="simple">
-<li><p>The <code class="docutils literal notranslate"><span class="pre">alpha-repo</span></code> has read-write access. The agent can clone, push, and call read-write GitHub API endpoints (pull requests, issues, comments).</p></li>
-<li><p>The <code class="docutils literal notranslate"><span class="pre">bravo-repo</span></code> has read-only access. The agent can clone and fetch, but the proxy denies push operations and mutating API calls.</p></li>
+<li><p>A <code class="docutils literal notranslate"><span class="pre">alpha-repo</span></code> repository with read-write access. The agent can clone, push, and call mutating GitHub API endpoints such as pull requests, issues, and comments.</p></li>
+<li><p>A <code class="docutils literal notranslate"><span class="pre">bravo-repo</span></code> repository with read-only access. The agent can clone and fetch, but push operations and mutating API calls are denied.</p></li>
+<li><p>All other GitHub repositories are denied by default. No clone, fetch, or API call to an unlisted repository is allowed.</p></li>
 </ul>
-<p>All other GitHub repositories are denied by default. No clone, fetch, or API call to an unlisted repository is allowed.</p>
-<p>After completing this tutorial, the sandbox environment will include:</p>
+<p>After completing this tutorial, the sandbox environment includes the following:</p>
 <ul class="simple">
-<li><p>A GitHub credential provider that injects your token into the sandbox at runtime.</p></li>
+<li><p>A GitHub credential provider that injects your GitHub token into the sandbox at runtime.</p></li>
 <li><p>A network policy that extends the default policy with per-repository GitHub access rules.</p></li>
-<li><p>A running sandbox in which Claude Code, OpenCode, and the <code class="docutils literal notranslate"><span class="pre">gh</span></code> CLI operate under the defined access constraints.</p></li>
+<li><p>A running sandbox in which Claude Code operates under the defined access constraints.</p></li>
 </ul>
 <section id="prerequisites">
 <h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h2>
@@ -703,9 +703,9 @@ Then try to create the same issue on &lt;org&gt;/bravo-repo.
 <h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">#</a></h2>
 <p>The following resources cover related topics in greater depth:</p>
 <ul class="simple">
-<li><p>For additional credential types, refer to <a class="reference internal" href="../sandboxes/providers.html"><span class="doc">Providers</span></a> for all supported provider types.</p></li>
-<li><p>For advanced policy configuration, refer to <a class="reference internal" href="../sandboxes/policies.html"><span class="doc">Customize Sandbox Policies</span></a> for additional examples and the full iteration workflow.</p></li>
-<li><p>For the policy YAML specification, refer to the <a class="reference internal" href="../reference/policy-schema.html"><span class="std std-doc">Policy Schema Reference</span></a> for the complete schema definition.</p></li>
+<li><p>To configure additional credential types, refer to <a class="reference internal" href="../sandboxes/providers.html"><span class="doc">Providers</span></a>.</p></li>
+<li><p>To iterate on policy configuration, refer to <a class="reference internal" href="../sandboxes/policies.html"><span class="doc">Customize Sandbox Policies</span></a>.</p></li>
+<li><p>To view the policy YAML specification, refer to the <a class="reference internal" href="../reference/policy-schema.html"><span class="std std-doc">Policy Schema Reference</span></a>.</p></li>
 </ul>
 </section>
 </section>
