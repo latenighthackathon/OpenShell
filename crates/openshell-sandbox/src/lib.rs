@@ -208,7 +208,8 @@ pub async fn run_sandbox(
         }
     };
 
-    let has_anthropic = provider_result.has_provider_type("anthropic");
+    let has_anthropic = provider_result.has_provider_type("anthropic")
+        || provider_result.has_provider_type("claude");
     let (provider_env, secret_resolver) =
         SecretResolver::from_provider_env(provider_result.flatten());
     let secret_resolver = secret_resolver.map(Arc::new);
@@ -1221,9 +1222,19 @@ fn write_provider_configs(has_anthropic: bool, policy: &SandboxPolicy) -> Result
 
     let claude_json_path = std::path::Path::new(&home).join(".claude.json");
 
-    let config = serde_json::json!({
-        "hasCompletedOnboarding": true
-    });
+    // Merge into existing .claude.json if present, so we don't clobber
+    // user-supplied or BYOC-baked configuration.
+    let mut config: serde_json::Value = if claude_json_path.exists() {
+        let existing = std::fs::read_to_string(&claude_json_path).into_diagnostic()?;
+        serde_json::from_str(&existing).unwrap_or_else(|_| serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    if let Some(obj) = config.as_object_mut() {
+        obj.entry("hasCompletedOnboarding")
+            .or_insert(serde_json::Value::Bool(true));
+    }
 
     if let Some(parent) = claude_json_path.parent() {
         std::fs::create_dir_all(parent).into_diagnostic()?;
