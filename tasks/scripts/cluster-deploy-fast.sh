@@ -80,6 +80,14 @@ image_push_duration=0
 helm_upgrade_duration=0
 gateway_rollout_duration=0
 total_duration=0
+gateway_deployed_digest=""
+gateway_target_digest=""
+skip_gateway_reconcile=0
+skip_gateway_reconcile_reason=""
+
+state_gateway_fingerprint=""
+state_supervisor_fingerprint=""
+state_helm_fingerprint=""
 
 mkdir -p "${DEPLOY_REPORT_DIR}"
 
@@ -94,6 +102,42 @@ cluster_exec() {
   docker exec "${CONTAINER_NAME}" sh -c "KUBECONFIG=/etc/rancher/k3s/k3s.yaml $*"
 }
 
+# Best-effort: find the currently running gateway image digest from pod status.
+get_deployed_gateway_digest() {
+  local image_id
+
+  while IFS= read -r image_id; do
+    case "${image_id}" in
+      *"${IMAGE_REPO_BASE}/gateway@"*)
+        printf '%s\n' "${image_id##*@}"
+        return 0
+        ;;
+    esac
+  done < <(
+    cluster_exec "kubectl get pods -n openshell -o jsonpath='{range .items[*]}{range .status.containerStatuses[*]}{.imageID}{\"\\n\"}{end}{end}'" 2>/dev/null || true
+  )
+
+  return 1
+}
+
+# Best-effort: resolve the pushed gateway tag to a digest from local docker metadata.
+get_tagged_gateway_digest() {
+  local repo_digest
+
+  while IFS= read -r repo_digest; do
+    case "${repo_digest}" in
+      "${IMAGE_REPO_BASE}/gateway@"*)
+        printf '%s\n' "${repo_digest##*@}"
+        return 0
+        ;;
+    esac
+  done < <(
+    docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "${IMAGE_REPO_BASE}/gateway:${IMAGE_TAG}" 2>/dev/null || true
+  )
+
+  return 1
+}
+
 # Path inside the container where the chart is copied for helm upgrades.
 CONTAINER_CHART_DIR=/tmp/openshell-chart
 
@@ -102,6 +146,7 @@ build_supervisor=0
 needs_helm_upgrade=0
 explicit_target=0
 targets_requested="${*:-auto}"
+helm_requested_by_gateway_build=0
 
 previous_gateway_fingerprint=""
 previous_supervisor_fingerprint=""
@@ -338,8 +383,9 @@ fi
 
 # Always run helm upgrade when the gateway image is rebuilt so that
 # the image tag and pull policy are set correctly.
-if [[ "${build_gateway}" == "1" ]]; then
+if [[ "${build_gateway}" == "1" && "${needs_helm_upgrade}" == "0" ]]; then
   needs_helm_upgrade=1
+  helm_requested_by_gateway_build=1
 fi
 
 echo "Fast deploy plan:"
@@ -445,9 +491,28 @@ if [[ "${#pushed_images[@]}" -gt 0 ]]; then
   image_push_duration=$((push_end - push_start))
 fi
 
+# If the pushed gateway digest is already running, skip gateway-only reconcile.
+# This avoids unnecessary helm+rollout churn when an explicit gateway build
+# produces the same digest.
+if [[ "${build_gateway}" == "1" ]]; then
+  gateway_deployed_digest=$(get_deployed_gateway_digest || true)
+  gateway_target_digest=$(get_tagged_gateway_digest || true)
+
+  if [[ -n "${gateway_target_digest}" && -n "${gateway_deployed_digest}" && "${gateway_target_digest}" == "${gateway_deployed_digest}" ]]; then
+    skip_gateway_reconcile=1
+    skip_gateway_reconcile_reason="digest_already_deployed"
+    echo "Gateway digest ${gateway_target_digest} is already deployed."
+
+    if [[ "${helm_requested_by_gateway_build}" == "1" && "${FORCE_HELM_UPGRADE}" != "1" ]]; then
+      needs_helm_upgrade=0
+      echo "Skipping helm upgrade (it was only requested for gateway image refresh)."
+    fi
+  fi
+fi
+
 # Evict rebuilt gateway image from k3s containerd cache so new pods pull
 # the updated image from the registry.
-if [[ "${build_gateway}" == "1" ]]; then
+if [[ "${build_gateway}" == "1" && "${skip_gateway_reconcile}" == "0" ]]; then
   echo "Evicting stale gateway image from k3s..."
   docker exec "${CONTAINER_NAME}" crictl rmi "${IMAGE_REPO_BASE}/gateway:${IMAGE_TAG}" >/dev/null 2>&1 || true
 fi
@@ -501,7 +566,7 @@ if [[ "${needs_helm_upgrade}" == "1" ]]; then
   helm_upgrade_duration=$((helm_end - helm_start))
 fi
 
-if [[ "${build_gateway}" == "1" ]]; then
+if [[ "${build_gateway}" == "1" && "${skip_gateway_reconcile}" == "0" ]]; then
   rollout_start=$(date +%s)
   echo "Restarting gateway to pick up updated image..."
   if cluster_exec "kubectl get statefulset/openshell -n openshell" >/dev/null 2>&1; then
@@ -516,6 +581,8 @@ if [[ "${build_gateway}" == "1" ]]; then
   rollout_end=$(date +%s)
   log_duration "Gateway rollout" "${rollout_start}" "${rollout_end}"
   gateway_rollout_duration=$((rollout_end - rollout_start))
+elif [[ "${build_gateway}" == "1" ]]; then
+  echo "Skipping gateway rollout (digest unchanged)."
 fi
 
 if [[ "${build_supervisor}" == "1" ]]; then
@@ -524,16 +591,37 @@ if [[ "${build_supervisor}" == "1" ]]; then
   echo "New sandbox pods will use the updated binary immediately (hostPath mount)."
 fi
 
-if [[ "${explicit_target}" == "0" ]]; then
-  mkdir -p "$(dirname "${DEPLOY_FAST_STATE_FILE}")"
-  cat > "${DEPLOY_FAST_STATE_FILE}" <<EOF
+# Keep deploy state aligned even when explicit targets are used.
+# For explicit runs, update only the components we actually reconciled so auto
+# mode remains accurate for untouched components.
+state_gateway_fingerprint="${current_gateway_fingerprint}"
+state_supervisor_fingerprint="${current_supervisor_fingerprint}"
+state_helm_fingerprint="${current_helm_fingerprint}"
+
+if [[ "${explicit_target}" == "1" ]]; then
+  state_gateway_fingerprint="${previous_gateway_fingerprint:-}"
+  state_supervisor_fingerprint="${previous_supervisor_fingerprint:-}"
+  state_helm_fingerprint="${previous_helm_fingerprint:-}"
+
+  if [[ "${build_gateway}" == "1" ]]; then
+    state_gateway_fingerprint="${current_gateway_fingerprint}"
+  fi
+  if [[ "${build_supervisor}" == "1" ]]; then
+    state_supervisor_fingerprint="${current_supervisor_fingerprint}"
+  fi
+  if [[ "${needs_helm_upgrade}" == "1" ]]; then
+    state_helm_fingerprint="${current_helm_fingerprint}"
+  fi
+fi
+
+mkdir -p "$(dirname "${DEPLOY_FAST_STATE_FILE}")"
+cat > "${DEPLOY_FAST_STATE_FILE}" <<EOF
 cluster_name=${CLUSTER_NAME}
 container_id=${current_container_id}
-gateway=${current_gateway_fingerprint}
-supervisor=${current_supervisor_fingerprint}
-helm=${current_helm_fingerprint}
+gateway=${state_gateway_fingerprint}
+supervisor=${state_supervisor_fingerprint}
+helm=${state_helm_fingerprint}
 EOF
-fi
 
 overall_end=$(date +%s)
 log_duration "Total deploy" "${overall_start}" "${overall_end}"
@@ -558,15 +646,26 @@ cat > "${DEPLOY_REPORT_FILE}" <<EOF
 - build_supervisor: \`${build_supervisor}\`
 - helm_upgrade: \`${needs_helm_upgrade}\`
 - force_helm_upgrade: \`${FORCE_HELM_UPGRADE}\`
+- helm_requested_by_gateway_build: \`${helm_requested_by_gateway_build}\`
+- gateway_reconcile_skipped: \`${skip_gateway_reconcile}\`
+- gateway_reconcile_skip_reason: \`${skip_gateway_reconcile_reason}\`
 
 ## Fingerprints
 
 - gateway_previous: \`${previous_gateway_fingerprint}\`
 - gateway_current: \`${current_gateway_fingerprint}\`
+- gateway_state_written: \`${state_gateway_fingerprint}\`
 - supervisor_previous: \`${previous_supervisor_fingerprint}\`
 - supervisor_current: \`${current_supervisor_fingerprint}\`
+- supervisor_state_written: \`${state_supervisor_fingerprint}\`
 - helm_previous: \`${previous_helm_fingerprint}\`
 - helm_current: \`${current_helm_fingerprint}\`
+- helm_state_written: \`${state_helm_fingerprint}\`
+
+## Gateway Digests
+
+- deployed_before: \`${gateway_deployed_digest}\`
+- target_after_push: \`${gateway_target_digest}\`
 
 ## Durations Seconds
 
