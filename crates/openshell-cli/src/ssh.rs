@@ -1198,4 +1198,3 @@ mod tests {
         assert!(args.contains(&format!("ServerAliveCountMax={SSH_SERVER_ALIVE_COUNT_MAX}")));
     }
 }
-}

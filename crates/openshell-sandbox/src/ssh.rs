@@ -10,9 +10,9 @@ use crate::sandbox;
 #[cfg(target_os = "linux")]
 use crate::{register_managed_child, unregister_managed_child};
 use miette::{IntoDiagnostic, Result};
-use openshell_core::net::enable_tcp_keepalive;
 use nix::pty::{Winsize, openpty};
 use nix::unistd::setsid;
+use openshell_core::net::enable_tcp_keepalive;
 use rand_core::OsRng;
 use russh::keys::{Algorithm, PrivateKey};
 use russh::server::{Auth, Handle, Session};
@@ -542,7 +542,7 @@ impl russh::server::Handler for SshHandler {
                 self.ca_file_paths.clone(),
                 &self.provider_env,
             )?;
-            self.input_sender = Some(input_sender);
+            self.channel_state(channel).input_sender = Some(input_sender);
         } else {
             warn!(subsystem = name, "unsupported subsystem requested");
             session.channel_failure(channel)?;
@@ -1207,8 +1207,8 @@ fn is_loopback_host(host: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::process::Stdio;
     use crate::policy::{FilesystemPolicy, LandlockPolicy, NetworkPolicy, ProcessPolicy};
+    use std::process::Stdio;
 
     fn test_channel_id(id: u32) -> ChannelId {
         #[allow(unsafe_code)]

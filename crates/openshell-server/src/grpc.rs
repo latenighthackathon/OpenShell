@@ -3928,11 +3928,8 @@ async fn start_single_use_ssh_proxy(
 
         // Connect to the resolved address directly (not the hostname) to
         // prevent TOCTOU between validation and connection.
-        let Ok(connect_result) = tokio::time::timeout(
-            SSH_PROXY_CONNECT_TIMEOUT,
-            TcpStream::connect(resolved),
-        )
-        .await
+        let Ok(connect_result) =
+            tokio::time::timeout(SSH_PROXY_CONNECT_TIMEOUT, TcpStream::connect(resolved)).await
         else {
             warn!(target_host = %target_host, resolved_ip = %resolved.ip(), target_port, "SSH proxy: timed out connecting to sandbox");
             return;
