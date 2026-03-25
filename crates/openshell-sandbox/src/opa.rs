@@ -1359,6 +1359,16 @@ process:
     }
 
     fn l7_input(host: &str, port: u16, method: &str, path: &str) -> serde_json::Value {
+        l7_input_with_query(host, port, method, path, "")
+    }
+
+    fn l7_input_with_query(
+        host: &str,
+        port: u16,
+        method: &str,
+        path: &str,
+        query: &str,
+    ) -> serde_json::Value {
         serde_json::json!({
             "network": { "host": host, "port": port },
             "exec": {
@@ -1368,7 +1378,8 @@ process:
             },
             "request": {
                 "method": method,
-                "path": path
+                "path": path,
+                "query": query
             }
         })
     }
@@ -1470,6 +1481,56 @@ process:
         // /repos/** should match /repos/org/repo
         let input = l7_input("api.example.com", 8080, "GET", "/repos/org/repo");
         assert!(eval_l7(&engine, &input));
+    }
+
+    /// Query strings are now stripped from the path before policy evaluation.
+    /// This test verifies that an exact path rule matches requests with query params.
+    #[test]
+    fn l7_path_with_query_string_matches_exact_path() {
+        let engine = l7_engine();
+        // Rule: path "/repos/*/issues" should match even with query params
+        let input = l7_input_with_query(
+            "api.example.com",
+            8080,
+            "POST",
+            "/repos/org/issues",
+            "page=2&per_page=50",
+        );
+        assert!(
+            eval_l7(&engine, &input),
+            "exact path should match regardless of query string"
+        );
+    }
+
+    /// Query strings don't affect glob path matching.
+    #[test]
+    fn l7_path_glob_with_query_string() {
+        let engine = l7_engine();
+        // Rule: path "/repos/**" should match with query params
+        let input = l7_input_with_query(
+            "api.example.com",
+            8080,
+            "GET",
+            "/repos/org/repo/pulls",
+            "state=open",
+        );
+        assert!(
+            eval_l7(&engine, &input),
+            "glob path should match regardless of query string"
+        );
+    }
+
+    /// Path that doesn't match the rule should still be denied even with query string.
+    #[test]
+    fn l7_wrong_path_with_query_string_denied() {
+        let engine = l7_engine();
+        // Rule only allows /repos/**, not /admin/**
+        let input =
+            l7_input_with_query("api.example.com", 8080, "GET", "/admin/settings", "foo=bar");
+        assert!(
+            !eval_l7(&engine, &input),
+            "non-matching path should still be denied"
+        );
     }
 
     #[test]

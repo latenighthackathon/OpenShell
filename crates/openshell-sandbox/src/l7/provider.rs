@@ -29,8 +29,12 @@ pub enum BodyLength {
 pub struct L7Request {
     /// Protocol action: HTTP method or SQL command.
     pub action: String,
-    /// Target: URL path for REST, empty for SQL.
+    /// Target: URL path for REST (without query string), empty for SQL.
     pub target: String,
+    /// Query string from the request URI (after `?`), empty if absent.
+    /// Kept separate from `target` so path-based policy matching is not
+    /// affected by the presence or content of query parameters.
+    pub query: String,
     /// Raw request header bytes (request line + headers for HTTP, message for SQL).
     /// May include overflow body bytes read during header parsing.
     pub raw_header: Vec<u8>,

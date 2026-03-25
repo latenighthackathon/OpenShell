@@ -74,8 +74,10 @@ pub struct L7Decision {
 pub struct L7RequestInfo {
     /// Protocol action: HTTP method (GET, POST, ...) or SQL command (SELECT, INSERT, ...).
     pub action: String,
-    /// Target: URL path for REST, or empty for SQL.
+    /// Target: URL path for REST (without query string), or empty for SQL.
     pub target: String,
+    /// Query string from the request URI (after `?`), empty if absent.
+    pub query: String,
 }
 
 /// Parse an L7 endpoint config from a regorus Value (returned by Rego query).

@@ -108,6 +108,7 @@ where
         let request_info = L7RequestInfo {
             action: req.action.clone(),
             target: req.target.clone(),
+            query: req.query.clone(),
         };
 
         // Evaluate L7 policy via Rego
@@ -127,6 +128,7 @@ where
             l7_protocol = "rest",
             l7_action = %request_info.action,
             l7_target = %request_info.target,
+            l7_query = %request_info.query,
             l7_decision = decision_str,
             l7_deny_reason = %reason,
             "L7_REQUEST",
@@ -198,6 +200,7 @@ fn evaluate_l7_request(
         "request": {
             "method": request.action,
             "path": request.target,
+            "query": request.query,
         }
     });
 

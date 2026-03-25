@@ -116,10 +116,16 @@ async fn parse_http_request<C: AsyncRead + Unpin>(client: &mut C) -> Result<Opti
         .next()
         .ok_or_else(|| miette!("Missing HTTP method"))?
         .to_string();
-    let path = parts
-        .next()
-        .ok_or_else(|| miette!("Missing HTTP path"))?
-        .to_string();
+    let raw_target = parts.next().ok_or_else(|| miette!("Missing HTTP path"))?;
+
+    // Split the request target into path and query string so that L7 policy
+    // path matching is not affected by query parameters.  The raw header
+    // bytes (forwarded to upstream) are left untouched — only the policy
+    // evaluation fields are split.
+    let (path, query) = raw_target
+        .split_once('?')
+        .map_or((raw_target, ""), |(p, q)| (p, q));
+
     let version = parts
         .next()
         .ok_or_else(|| miette!("Missing HTTP version"))?;
@@ -132,7 +138,8 @@ async fn parse_http_request<C: AsyncRead + Unpin>(client: &mut C) -> Result<Opti
 
     Ok(Some(L7Request {
         action: method,
-        target: path,
+        target: path.to_string(),
+        query: query.to_string(),
         raw_header: buf, // exact header bytes up to and including \r\n\r\n
         body_length,
     }))
@@ -783,6 +790,69 @@ mod tests {
         assert_eq!(second.target, "/blocked");
     }
 
+    /// Query string is split from path for policy matching.
+    #[tokio::test]
+    async fn parse_http_request_splits_query_string() {
+        let (mut client, mut writer) = tokio::io::duplex(4096);
+        tokio::spawn(async move {
+            writer
+                .write_all(
+                    b"GET /api/v1/download?slug=my-skill&version=1.0 HTTP/1.1\r\nHost: x\r\n\r\n",
+                )
+                .await
+                .unwrap();
+        });
+        let req = parse_http_request(&mut client)
+            .await
+            .expect("should parse")
+            .expect("expected request");
+        assert_eq!(req.action, "GET");
+        assert_eq!(
+            req.target, "/api/v1/download",
+            "path should not include query string"
+        );
+        assert_eq!(
+            req.query, "slug=my-skill&version=1.0",
+            "query should be captured"
+        );
+    }
+
+    /// Path without query string has empty query field.
+    #[tokio::test]
+    async fn parse_http_request_no_query_string() {
+        let (mut client, mut writer) = tokio::io::duplex(4096);
+        tokio::spawn(async move {
+            writer
+                .write_all(b"GET /api/v1/download HTTP/1.1\r\nHost: x\r\n\r\n")
+                .await
+                .unwrap();
+        });
+        let req = parse_http_request(&mut client)
+            .await
+            .expect("should parse")
+            .expect("expected request");
+        assert_eq!(req.target, "/api/v1/download");
+        assert_eq!(req.query, "", "query should be empty when no ? present");
+    }
+
+    /// Empty query string (path ends with ?) results in empty query field.
+    #[tokio::test]
+    async fn parse_http_request_empty_query_string() {
+        let (mut client, mut writer) = tokio::io::duplex(4096);
+        tokio::spawn(async move {
+            writer
+                .write_all(b"GET /api/v1/download? HTTP/1.1\r\nHost: x\r\n\r\n")
+                .await
+                .unwrap();
+        });
+        let req = parse_http_request(&mut client)
+            .await
+            .expect("should parse")
+            .expect("expected request");
+        assert_eq!(req.target, "/api/v1/download");
+        assert_eq!(req.query, "", "empty query after ? should be empty string");
+    }
+
     #[test]
     fn http_method_detection() {
         assert!(looks_like_http(b"GET / HTTP/1.1\r\n"));
@@ -1149,6 +1219,7 @@ mod tests {
         let req = L7Request {
             action: "POST".to_string(),
             target: "/v1/chat/completions".to_string(),
+            query: String::new(),
             raw_header: format!(
                 "POST /v1/chat/completions HTTP/1.1\r\n\
                  Host: integrate.api.nvidia.com\r\n\
@@ -1232,6 +1303,7 @@ mod tests {
         let req = L7Request {
             action: "POST".to_string(),
             target: "/v1/chat/completions".to_string(),
+            query: String::new(),
             raw_header: format!(
                 "POST /v1/chat/completions HTTP/1.1\r\n\
                  Host: integrate.api.nvidia.com\r\n\
