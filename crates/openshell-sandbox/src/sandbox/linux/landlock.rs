@@ -58,9 +58,7 @@ pub fn apply(policy: &SandboxPolicy, workdir: Option<&str>) -> Result<()> {
                         "Landlock allow read-only"
                     );
                     ruleset = ruleset
-                        .add_rule(PathBeneath::new(
-                            path_fd, access_read,
-                        ))
+                        .add_rule(PathBeneath::new(path_fd, access_read))
                         .into_diagnostic()?;
                 }
                 Err(err) => {
@@ -81,9 +79,7 @@ pub fn apply(policy: &SandboxPolicy, workdir: Option<&str>) -> Result<()> {
                         "Landlock allow read-write"
                     );
                     ruleset = ruleset
-                        .add_rule(PathBeneath::new(
-                            path_fd, access_all,
-                        ))
+                        .add_rule(PathBeneath::new(path_fd, access_all))
                         .into_diagnostic()?;
                 }
                 Err(err) => {
