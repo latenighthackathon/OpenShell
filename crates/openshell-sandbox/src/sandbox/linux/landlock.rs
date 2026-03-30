@@ -51,23 +51,49 @@ pub fn apply(policy: &SandboxPolicy, workdir: Option<&str>) -> Result<()> {
         let mut ruleset = ruleset.create().into_diagnostic()?;
 
         for path in read_only {
-            debug!(path = %path.display(), "Landlock allow read-only");
-            ruleset = ruleset
-                .add_rule(PathBeneath::new(
-                    PathFd::new(path).into_diagnostic()?,
-                    access_read,
-                ))
-                .into_diagnostic()?;
+            match PathFd::new(&path) {
+                Ok(path_fd) => {
+                    debug!(
+                        path = %path.display(),
+                        "Landlock allow read-only"
+                    );
+                    ruleset = ruleset
+                        .add_rule(PathBeneath::new(
+                            path_fd, access_read,
+                        ))
+                        .into_diagnostic()?;
+                }
+                Err(err) => {
+                    warn!(
+                        path = %path.display(),
+                        error = %err,
+                        "Skipping non-existent read-only path"
+                    );
+                }
+            }
         }
 
         for path in read_write {
-            debug!(path = %path.display(), "Landlock allow read-write");
-            ruleset = ruleset
-                .add_rule(PathBeneath::new(
-                    PathFd::new(path).into_diagnostic()?,
-                    access_all,
-                ))
-                .into_diagnostic()?;
+            match PathFd::new(&path) {
+                Ok(path_fd) => {
+                    debug!(
+                        path = %path.display(),
+                        "Landlock allow read-write"
+                    );
+                    ruleset = ruleset
+                        .add_rule(PathBeneath::new(
+                            path_fd, access_all,
+                        ))
+                        .into_diagnostic()?;
+                }
+                Err(err) => {
+                    warn!(
+                        path = %path.display(),
+                        error = %err,
+                        "Skipping non-existent read-write path"
+                    );
+                }
+            }
         }
 
         ruleset.restrict_self().into_diagnostic()?;
