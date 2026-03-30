@@ -534,16 +534,38 @@ pub async fn sandbox_sync_up(
 ) -> Result<()> {
     let session = ssh_session_config(server, name, tls).await?;
 
+    // When uploading a single file to an explicit path, mkdir -p must target
+    // the parent directory, not the destination itself — otherwise a directory
+    // is created where a file is expected (see #667).
+    let is_single_file = local_path.is_file();
+    let remote_command = if is_single_file {
+        // Extract parent dir; if sandbox_path has no parent (e.g. bare filename),
+        // fall back to the path itself as the extraction directory.
+        let dest = std::path::Path::new(sandbox_path);
+        let parent = dest
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .filter(|p| !p.is_empty())
+            .unwrap_or_else(|| sandbox_path.to_string());
+        format!(
+            "mkdir -p {} && cat | tar xf - -C {}",
+            shell_escape(&parent),
+            shell_escape(&parent),
+        )
+    } else {
+        format!(
+            "mkdir -p {} && cat | tar xf - -C {}",
+            shell_escape(sandbox_path),
+            shell_escape(sandbox_path),
+        )
+    };
+
     let mut ssh = ssh_base_command(&session.proxy_command);
     ssh.arg("-T")
         .arg("-o")
         .arg("RequestTTY=no")
         .arg("sandbox")
-        .arg(format!(
-            "mkdir -p {} && cat | tar xf - -C {}",
-            shell_escape(sandbox_path),
-            shell_escape(sandbox_path)
-        ))
+        .arg(&remote_command)
         .stdin(Stdio::piped())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit());
@@ -555,14 +577,19 @@ pub async fn sandbox_sync_up(
         .ok_or_else(|| miette::miette!("failed to open stdin for ssh process"))?;
 
     let local_path = local_path.to_path_buf();
+    let sandbox_path_owned = sandbox_path.to_string();
     tokio::task::spawn_blocking(move || -> Result<()> {
         let mut archive = tar::Builder::new(stdin);
         if local_path.is_file() {
-            let file_name = local_path
+            // Use the destination filename (not the local filename) so tar
+            // extracts the file with the name the user specified.
+            let dest = std::path::Path::new(&sandbox_path_owned);
+            let archive_name = dest
                 .file_name()
-                .ok_or_else(|| miette::miette!("path has no file name"))?;
+                .map(|n| n.to_os_string())
+                .unwrap_or_else(|| local_path.file_name().unwrap_or_default().to_os_string());
             archive
-                .append_path_with_name(&local_path, file_name)
+                .append_path_with_name(&local_path, archive_name)
                 .into_diagnostic()?;
         } else if local_path.is_dir() {
             archive.append_dir_all(".", &local_path).into_diagnostic()?;
