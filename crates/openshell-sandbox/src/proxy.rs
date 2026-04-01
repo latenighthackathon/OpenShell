@@ -328,7 +328,7 @@ async fn handle_tcp_connection(
         )
         .await?;
         if let InferenceOutcome::Denied { reason } = outcome {
-            info!(action = "deny", reason = %reason, host = INFERENCE_LOCAL_HOST, "Inference interception denied");
+            warn!(action = "deny", reason = %reason, host = INFERENCE_LOCAL_HOST, "Inference interception denied");
         }
         return Ok(());
     }
@@ -386,7 +386,7 @@ async fn handle_tcp_connection(
     // Allowed connections are logged after the L7 config check (below)
     // so we can distinguish CONNECT (L4-only) from CONNECT_L7 (L7 follows).
     if matches!(decision.action, NetworkAction::Deny { .. }) {
-        info!(
+        warn!(
             src_addr = %peer_addr.ip(),
             src_port = peer_addr.port(),
             proxy_addr = %local_addr,
@@ -1770,7 +1770,7 @@ async fn handle_forward_proxy(
     let matched_policy = match &decision.action {
         NetworkAction::Allow { matched_policy } => matched_policy.clone(),
         NetworkAction::Deny { reason } => {
-            info!(
+            warn!(
                 src_addr = %peer_addr.ip(),
                 src_port = peer_addr.port(),
                 proxy_addr = %local_addr,
