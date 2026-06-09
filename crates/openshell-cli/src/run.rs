@@ -83,6 +83,7 @@ enum SandboxUploadPlan {
         files: Vec<String>,
     },
     Regular,
+    GitFilteredEmpty,
 }
 
 /// Convert a sandbox phase integer to a human-readable string.
@@ -2119,6 +2120,21 @@ pub async fn sandbox_create(
                             &sandbox_name,
                             &base_dir,
                             &files,
+                            local,
+                            dest,
+                            &effective_tls,
+                        )
+                        .await?;
+                    }
+                    SandboxUploadPlan::GitFilteredEmpty => {
+                        eprintln!(
+                            "  {} .gitignore filtering excluded all files in {}; uploading unfiltered",
+                            "⚠".yellow().bold(),
+                            local.display(),
+                        );
+                        sandbox_sync_up(
+                            &effective_server,
+                            &sandbox_name,
                             local,
                             dest,
                             &effective_tls,
@@ -5804,6 +5820,9 @@ fn sandbox_upload_plan(local_path: &Path, git_ignore: bool) -> Result<SandboxUpl
         && !metadata.file_type().is_symlink()
         && let Ok((base_dir, files)) = git_sync_files(local_path)
     {
+        if files.is_empty() {
+            return Ok(SandboxUploadPlan::GitFilteredEmpty);
+        }
         return Ok(SandboxUploadPlan::GitAware { base_dir, files });
     }
 
@@ -8362,6 +8381,25 @@ mod tests {
             .expect("symlink upload should be planned");
 
         assert_eq!(plan, super::SandboxUploadPlan::Regular);
+    }
+
+    #[test]
+    fn sandbox_upload_plan_falls_back_when_all_files_gitignored() {
+        let tmpdir = tempfile::tempdir().expect("create tmpdir");
+        let repo = tmpdir.path().join("repo");
+        fs::create_dir_all(repo.join("runs")).expect("create repo");
+        init_git_repo(&repo);
+        fs::write(repo.join(".gitignore"), "runs/\n").expect("write .gitignore");
+        fs::write(repo.join("runs/test.json"), r#"{"key":"value"}"#).expect("write test.json");
+
+        let plan =
+            sandbox_upload_plan(&repo.join("runs"), true).expect("upload plan should succeed");
+
+        assert_eq!(
+            plan,
+            super::SandboxUploadPlan::GitFilteredEmpty,
+            "gitignored directory should fall back with GitFilteredEmpty"
+        );
     }
 
     #[test]
